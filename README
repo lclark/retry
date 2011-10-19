@@ -1,0 +1,20 @@
+usage: retry [-d duration]  [-i interval] -- command [args ...]
+Retry command for specified duration at specified interval
+
+  -d  length of time to retry command, in seconds
+  -i  delay between attempts
+
+Examples:
+  Retry command "true" for 1 hour, every 60 seconds, or until success:
+  # retry -- true
+
+  Retry command "false" for 10 seconds, every 2 seconds, or until
+  success.  Send email on failure.
+  # retry -d 10 -i 2 -- false || mutt -s "false failed all attempts" \
+    lclark@2bdx.net </dev/null
+
+  The following represents alternate methods to wait for a file.  The
+  retry version differs in that it times out.
+  # while [ ! -f $file ]; do sleep 1; done
+
+  # retry -i 1 -d 30 -- [ -f $file ] || echo "File not found"

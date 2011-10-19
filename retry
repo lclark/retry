@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+function -usage {
+  cat <<EOF >&2
+usage: $0 [-d duration]  [-i interval] -- command [args ...]
+Retry command for specified duration at specified interval
+
+  -d  length of time to retry command, in seconds
+  -i  delay between attempts
+
+Examples:
+  Retry command "true" for 1 hour, every 60 seconds, or until success:
+  # retry -- true
+
+  Retry command "false" for 10 seconds, every 2 seconds, or until
+  success.  Send email on failure.
+  # retry -d 10 -i 2 -- false || mutt -s "false failed all attempts" \
+    lclark@2bdx.net </dev/null
+
+  The following represents alternate methods to wait for a file.  The
+  retry version differs in that it times out.
+  # while [ ! -f $file ]; do sleep 1; done
+
+  # retry -i 1 -d 30 -- [ -f $file ] || echo "File not found"
+EOF
+}
+
+# Default interval and duration, specified in seconds.
+DEFAULT_INTERVAL=60
+DEFAULT_DURATION=3600
+
+function -complain {
+  echo "$@" >&2
+}
+
+function -get-time {
+  if [ -z "$1" ]; then
+    date +%Y%m%d%H%M%S
+  else
+    date -d "$1" +%Y%m%d%H%M%S
+  fi
+}
+
+interval=$DEFAULT_INTERVAL
+duration=$DEFAULT_DURATION
+
+while getopts ":?i:d:" opt; do
+  case $opt in
+    i)  # Interval, in seconds.
+      interval=$OPTARG
+      ;;
+    d)  # Duration, in seconds
+      duration=$OPTARG
+      ;;
+    *)
+      -usage
+      exit 1
+      ;;
+  esac
+done
+
+# Shift args forward to --
+for arg; do
+  case $arg in
+    --)
+      shift
+      break
+      ;;
+    --help)
+      -usage
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+if [ -z "$1" ]; then
+  # No command
+  -usage
+  exit 1
+fi
+
+# Abort early if command not found (so it doesn't sit and retry
+# something that will never work)
+hash $1 >/dev/null 2>&1 || $(echo "$1: command not found" && exit 1)
+
+end=$(-get-time "+$duration seconds")
+
+ret_val=-1
+
+while [ $(-get-time) -lt $end ]; do
+  $@ && exit $?
+  ret_val=$?
+  -complain "# $(date '+%Y-%m-%d %H:%M:%S') command failed; retry in $interval seconds (cutoff: $end)"
+  sleep $interval
+done
+
+exit $ret_val
