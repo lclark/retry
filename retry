@@ -82,7 +82,11 @@ fi
 
 # Abort early if command not found (so it doesn't sit and retry
 # something that will never work)
-hash $1 >/dev/null 2>&1 || $(echo "$1: command not found" && exit 1)
+hash $1 >/dev/null 2>&1
+if [ $? -ne 0 ]; then
+  echo "$1: command not found" >&2
+  exit 1
+fi
 
 end=$(-get-time "+$duration seconds")
 
